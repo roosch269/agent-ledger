@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: Add an 'apply to work with us' banner to the homepage.

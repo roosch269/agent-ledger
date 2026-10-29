@@ -1,0 +1,2 @@
+Agent: cobalt
+Proposed action: Deploy the menu-css branch to staging for a visual check.

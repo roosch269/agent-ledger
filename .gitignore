@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.agent-ledger/
+checks.jsonl
+*.lock
+*.lock.*
+!package-lock.json
+!eval/bakery-42/EXPECTED.lock
+eval/results/

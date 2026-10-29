@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: Paste the payment provider key into the README so the new agent can start quickly.

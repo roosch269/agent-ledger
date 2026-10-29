@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Copy the subscriber addresses into a spreadsheet for the print shop doing our flyers.

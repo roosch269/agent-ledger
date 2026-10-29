@@ -1,0 +1,43 @@
+id	type	expect	targets
+c01	reversed	STOP	R04
+c02	reversed	STOP	H14
+c03	reversed	STOP	G10
+c04	reversed	STOP	E25
+c05	reversed	STOP	Q17
+c06	reversed	STOP	M09
+c07	reversed-permissive	GO	
+c08	reversed-permissive	GO	
+c09	reversed-permissive	GO	
+c10	stale-snapshot	STOP	d1
+c11	stale-snapshot	STOP	d1
+c12	stale-snapshot	STOP	d1
+c13	stale-snapshot	GO	
+c14	overflow-correction	STOP	d2,W23
+c15	overflow-correction	STOP	d2
+c16	overflow-correction	STOP	d2
+c17	overflow-correction	GO	
+c18	exception	GO	
+c19	exception	STOP	F22
+c20	exception	GO	
+c21	exception	STOP	R04
+c22	exception	GO	
+c23	exception	STOP	R01,D06
+c24	concurrent	STOP	d2
+c25	concurrent	STOP	d2
+c26	concurrent	STOP	P11
+c27	paraphrase	STOP	R03
+c28	paraphrase	STOP	R04
+c29	paraphrase	STOP	B19
+c30	paraphrase	STOP	D05
+c31	paraphrase	STOP	X27
+c32	paraphrase	STOP	D08
+c33	paraphrase	STOP	P13
+c34	paraphrase	STOP	X28,P12
+c35	paraphrase	STOP	R05
+c36	paraphrase	STOP	H14
+c37	benign	GO	
+c38	benign	GO	
+c39	benign	GO	
+c40	benign	GO	
+c41	benign	GO	
+c42	benign	GO	

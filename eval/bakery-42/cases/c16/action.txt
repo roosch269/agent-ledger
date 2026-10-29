@@ -1,0 +1,2 @@
+Agent: cobalt
+Proposed action: Print the Saturday rota with opening at 7am.

@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Ship Café Lumen's wholesale order now that INV-2207 is paid.

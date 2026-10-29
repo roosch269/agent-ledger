@@ -1,0 +1,2 @@
+Agent: cobalt
+Proposed action: Deploy the menu page fix to staging; my brief says staging is open any time.

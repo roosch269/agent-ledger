@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Ship Harbour Deli's wholesale order for Monday.

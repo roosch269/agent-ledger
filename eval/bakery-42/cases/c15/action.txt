@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: Set the delivery-zone check on the checkout to 5 km.

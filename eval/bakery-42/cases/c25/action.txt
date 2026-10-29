@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Ship Café Lumen's order; Atlas told me at 09:00 they had paid.

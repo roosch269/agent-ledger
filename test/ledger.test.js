@@ -1,0 +1,180 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { openLedger, ConflictError } from '../src/index.js';
+import { load, validate, newEntry, ledgerPath } from '../src/ledger.js';
+import { clashReason } from '../src/match.js';
+import { withLock, LOCK_STALE_MS } from '../src/lock.js';
+import { temp, cli, child, env } from './helpers.js';
+
+const fields = { claim: 'The package limit is 10 items.', source_agent: 'worker-1', ts: '2026-01-01T00:00:00Z' };
+test('stable IDs, metadata kinds, defaults and idempotent init', (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  assert.equal(ledger.init().created, true);
+  const result = ledger.add({ ...fields, kind: 'rule' });
+  assert.match(result.entry.id, /^L-[0-9a-f]{10}$/);
+  assert.deepEqual(validate(result.entry), []);
+  assert.equal(result.entry.scope, 'general');
+  assert.equal(ledger.init().created, false);
+  assert.equal(ledger.add({ ...fields, kind: 'rule' }).duplicate, true);
+  assert.equal(ledger.list().length, 1);
+  assert.equal(newEntry(fields).id, newEntry(fields).id);
+});
+test('path precedence is explicit file, ledger env, directory, XDG, home', () => {
+  assert.equal(ledgerPath({ LEDGER_FILE: 'explicit.jsonl', LEDGER_DIR: 'data' }), path.resolve('explicit.jsonl'));
+  assert.equal(ledgerPath({ LEDGER_DIR: 'data', XDG_DATA_HOME: 'xdg' }), path.resolve('data/ledger.jsonl'));
+  assert.equal(ledgerPath({ XDG_DATA_HOME: 'xdg' }), path.resolve('xdg/agent-ledger/ledger.jsonl'));
+  assert.equal(ledgerPath({ HOME: 'home' }), path.resolve('home/.local/share/agent-ledger/ledger.jsonl'));
+  assert.equal(openLedger({ file: 'override', env: { LEDGER_FILE: 'ignored' } }).file, path.resolve('override'));
+});
+test('reject empty, missing, non-string claims and invalid known fields without writing', (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  ledger.init();
+  for (const claim of [undefined, null, '', ' \n', 4]) assert.throws(() => ledger.add({ claim }), /claim/);
+  for (const extra of [{ kind: 'other' }, { source_agent: '' }, { scope: '' }, { ts: 'bad' }, { evidence: [null] }]) assert.throws(() => ledger.add({ ...fields, ...extra }), /invalid entry/);
+  assert.equal(fs.readFileSync(file, 'utf8'), '');
+  assert.equal(fs.existsSync(`${file}.lock`), false);
+});
+test('load validates every historical line and tolerates unknown and legacy fields', (t) => {
+  const file = temp(t), entry = { ...newEntry(fields), subject: 'package', predicate: 'limit', future_metadata: { arbitrary: true } };
+  fs.writeFileSync(file, JSON.stringify(entry) + '\n');
+  assert.deepEqual(load(file)[0].future_metadata, { arbitrary: true });
+  assert.equal(load(file)[0].subject, 'package');
+  assert.equal(load(file)[0].predicate, 'limit');
+  fs.appendFileSync(file, 'null\n');
+  assert.throws(() => load(file), /:2: entry must be an object/);
+  fs.writeFileSync(file, '{}\n' + JSON.stringify(entry) + '\n');
+  assert.throws(() => load(file), /:1:.*id/);
+  fs.writeFileSync(file, JSON.stringify(entry) + '\n{');
+  assert.throws(() => load(file), /:2: invalid JSON/);
+});
+test('new entries omit subject and predicate even when supplied by legacy callers', (t) => {
+  const ledger = openLedger({ file: temp(t) });
+  const entry = ledger.add({ ...fields, subject: 'package', predicate: 'limit' }).entry;
+  assert.equal(Object.hasOwn(entry, 'subject'), false);
+  assert.equal(Object.hasOwn(entry, 'predicate'), false);
+  assert.deepEqual(ledger.get(entry.id), newEntry(fields));
+  const replacement = ledger.supersede(entry.id, 'New policy', { subject: 'package', predicate: 'limit' }).entry;
+  assert.equal(Object.hasOwn(replacement, 'subject'), false);
+  assert.equal(Object.hasOwn(replacement, 'predicate'), false);
+});
+test('append repairs a missing final newline and keeps previous bytes', (t) => {
+  const file = temp(t), first = JSON.stringify(newEntry(fields));
+  fs.writeFileSync(file, first);
+  openLedger({ file }).add({ claim: 'Keep an audit trail.' });
+  assert.ok(fs.readFileSync(file, 'utf8').startsWith(first + '\n'));
+  assert.equal(load(file).length, 2);
+});
+test('supersede appends snapshots, double supersede refuses and names successor', (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  const old = ledger.add(fields).entry;
+  const before = fs.readFileSync(file, 'utf8');
+  const next = ledger.supersede(old.id, 'The package limit is 12 items.').entry;
+  assert.equal(ledger.get(old.id).superseded_by, next.id);
+  assert.equal(ledger.get(old.id).status, 'superseded');
+  const after = fs.readFileSync(file, 'utf8');
+  assert.ok(after.startsWith(before));
+  assert.equal(after.trim().split('\n').length, 3);
+  assert.throws(() => ledger.supersede(old.id, 'The package limit is 15 items.'), (error) => error instanceof ConflictError && error.message.includes(next.id));
+  assert.throws(() => ledger.resolve(old.id, { note: 'Attempt resurrection.' }), /already superseded/);
+  assert.throws(() => ledger.contest(old.id, { note: 'Attempt revision.' }), /already superseded/);
+  assert.equal(fs.readFileSync(file, 'utf8'), after);
+  const refused = cli(['supersede', old.id, 'Another change', '--file', file, '--json']);
+  assert.equal(refused.status, 2);
+  assert.match(JSON.parse(refused.stderr).error.message, new RegExp(next.id));
+});
+test('invalid replacement does not write the old snapshot', (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  const old = ledger.add(fields).entry, before = fs.readFileSync(file, 'utf8');
+  assert.throws(() => ledger.supersede(old.id, 'New limit', { kind: 'invalid' }));
+  assert.throws(() => ledger.supersede('L-0000000000', 'Unknown target'), /unknown entry/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+});
+test('clear overlap plus changed numbers contests both; force skips detection', (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  const old = ledger.add(fields).entry;
+  const result = ledger.add({ claim: 'The package limit is 12 items.' });
+  assert.equal(result.entry.status, 'contested');
+  assert.equal(result.conflicts[0].reason, 'numbers differ');
+  assert.equal(ledger.get(old.id).status, 'contested');
+  const forced = ledger.add({ claim: 'The package limit is 15 items.' }, { force: true });
+  assert.equal(forced.entry.status, 'active');
+  assert.equal(forced.conflicts.length, 0);
+  assert.equal(clashReason('Publishing reports is allowed', 'Publishing reports is not allowed'), 'negation flip');
+  assert.equal(clashReason('Never delete production data', 'The package limit is 10 items'), null);
+  assert.equal(clashReason('The package limit is 10 items', 'The package limit is 10 items'), null);
+  assert.equal(clashReason('The limit is 1', 'The limit is 2'), 'numbers differ');
+});
+test('contest and resolve preserve evidence and cannot replace anything', (t) => {
+  const ledger = openLedger({ file: temp(t) });
+  const entry = ledger.add(fields).entry;
+  assert.throws(() => ledger.contest(entry.id, {}), /note/);
+  assert.equal(ledger.contest(entry.id, { note: 'Conflicting observation', agent: 'worker-2' }).status, 'contested');
+  const resolved = ledger.resolve(entry.id, { note: 'Confirmed with source' });
+  assert.equal(resolved.status, 'active');
+  assert.equal(resolved.evidence.length, 2);
+  assert.equal(ledger.get('L-0000000000'), null);
+});
+test('list and audit report current state and recent evidence', (t) => {
+  const ledger = openLedger({ file: temp(t) });
+  const first = ledger.add(fields).entry;
+  const second = ledger.add({ claim: 'Use a staging environment.', scope: 'rules', ts: fields.ts }).entry;
+  ledger.contest(second.id, { note: 'Under review' });
+  assert.equal(ledger.list({ scope: 'rules', status: 'contested' })[0].id, second.id);
+  assert.throws(() => ledger.list({ status: 'bad' }), /status/);
+  let report = ledger.audit({ now: new Date('2026-02-01T00:00:00Z') });
+  assert.equal(report.stale[0].id, first.id); assert.equal(report.contested.length, 1);
+  ledger.resolve(first.id, { note: 'Reconfirmed' });
+  report = ledger.audit(); assert.equal(report.stale.length, 0);
+  assert.throws(() => ledger.audit({ staleDays: NaN }), /staleDays/);
+});
+test('concurrent supersedes have exactly one winner', async (t) => {
+  const file = temp(t), ledger = openLedger({ file });
+  const old = ledger.add(fields).entry;
+  const results = await Promise.all([11, 12, 13, 14].map((value) => child(['supersede', old.id, `The package limit is ${value} items.`, '--file', file, '--json'])));
+  assert.deepEqual(results.map((result) => result.status).sort(), [0, 2, 2, 2]);
+  const successors = ledger.list().filter((entry) => entry.supersedes === old.id);
+  assert.equal(successors.length, 1); assert.equal(successors[0].status, 'active');
+  assert.equal(ledger.get(old.id).superseded_by, successors[0].id);
+});
+test('concurrent adds preserve every entry and concurrent clashes are visible', async (t) => {
+  const file = temp(t);
+  const results = await Promise.all([10, 11, 12, 13].map((value) => child(['add', `The package limit is ${value} items.`, '--file', file])));
+  assert.equal(results.filter((result) => result.status === 0).length, 1);
+  assert.equal(results.filter((result) => result.status === 2).length, 3);
+  assert.equal(load(file).length, 4);
+  assert.ok(load(file).every((entry) => entry.status === 'contested'));
+});
+test('stale abandoned locks are taken over even with concurrent writers', async (t) => {
+  const file = temp(t), lock = `${file}.lock`;
+  fs.writeFileSync(lock, JSON.stringify({ pid: 2147483647, timestamp: Date.now() - LOCK_STALE_MS - 1000 }));
+  const results = await Promise.all([1, 2, 3].map((n) => child(['add', `Observation ${n}`, '--force', '--file', file])));
+  assert.ok(results.every((result) => result.status === 0), JSON.stringify(results));
+  assert.equal(load(file).length, 3);
+  assert.equal(fs.existsSync(lock), false);
+  assert.equal(fs.existsSync(`${lock}.lock`), false);
+});
+test('live locks are respected for the bounded wait even when old', (t) => {
+  const file = temp(t), lock = `${file}.lock`;
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, timestamp: 0, token: 'live' }));
+  fs.utimesSync(lock, new Date(0), new Date(0));
+  const started = Date.now();
+  assert.throws(() => openLedger({ file }).add(fields), /ledger is locked/);
+  assert.ok(Date.now() - started >= 4900);
+  assert.ok(Date.now() - started < 7000);
+  assert.equal(JSON.parse(fs.readFileSync(lock)).token, 'live');
+  assert.equal(fs.existsSync(file), false);
+});
+test('lock is released in finally after failures and load is re-read under lock', (t) => {
+  const file = temp(t);
+  assert.throws(() => withLock(file, () => { throw new Error('intentional'); }), /intentional/);
+  assert.equal(fs.existsSync(`${file}.lock`), false);
+  const ledger = openLedger({ file, env: env() });
+  ledger.add(fields);
+  fs.appendFileSync(file, '{}\n');
+  const before = fs.readFileSync(file, 'utf8');
+  assert.throws(() => ledger.add({ claim: 'Another claim' }), /:2:/);
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(fs.existsSync(`${file}.lock`), false);
+});

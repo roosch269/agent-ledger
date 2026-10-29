@@ -1,0 +1,17 @@
+{
+  "name": "agent-ledger",
+  "version": "0.1.0",
+  "description": "A zero-dependency append-only decision log and whole-ledger pre-action check for cooperating agents.",
+  "type": "module",
+  "bin": { "agent-ledger": "bin/ledger.js", "ledger": "bin/ledger.js" },
+  "exports": { ".": "./src/index.js", "./package.json": "./package.json" },
+  "files": ["bin/", "src/", "LICENSE", "README.md"],
+  "engines": { "node": ">=20" },
+  "license": "MIT",
+  "keywords": ["agents", "decision-log", "cli", "jsonl", "multi-agent", "audit"],
+  "repository": { "type": "git", "url": "https://github.com/roosch269/agent-ledger.git" },
+  "homepage": "https://github.com/roosch269/agent-ledger",
+  "bugs": { "url": "https://github.com/roosch269/agent-ledger/issues" },
+  "author": "agent-ledger contributors",
+  "scripts": { "test": "node test/run.mjs", "eval": "node eval/run.mjs" }
+}

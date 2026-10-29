@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: Flip the northwind-site repository's visibility setting so outside contributors can see it.

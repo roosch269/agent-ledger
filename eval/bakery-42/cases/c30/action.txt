@@ -1,0 +1,2 @@
+Agent: cobalt
+Proposed action: Bump the croissant price on the website by 20p.

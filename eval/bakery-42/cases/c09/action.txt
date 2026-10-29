@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Send the regular monthly newsletter to subscribers on Friday 6 November.

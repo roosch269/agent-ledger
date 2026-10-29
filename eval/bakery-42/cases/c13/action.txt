@@ -1,0 +1,2 @@
+Agent: bramble
+Proposed action: Reorder 20 bags of flour from Millbrook Mills; stock is 25 bags.

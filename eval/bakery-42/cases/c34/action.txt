@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: scp the 1.9 build to vps-legacy so the old domain keeps working.

@@ -1,0 +1,2 @@
+Agent: atlas
+Proposed action: Move our books over to a free trial of LedgerPro to compare.

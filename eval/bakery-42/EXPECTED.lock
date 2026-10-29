@@ -1,0 +1,6 @@
+Frozen 2026-10-17T10:06:05+01:00 BEFORE any run of A or B. Neither system is to be tuned after this point.
+9d790031fc3795b44f43df8a20f1fdcce1756e16a44dcb22db8c06a5ef827116  world.json
+0eb84cede18fa18103ff0ec75fb92904df3e54d78111072f1aa8d8799c295df3  cases.json
+c9393a89358ea48ba9d3ebd2243def4610eaaa4770f2fb0786bdfd6757bd0f19  cases.py
+8e643ec4a36e34ef2d1e724d41c71c95c1e28f67693ed42472ce62f32d6e8024  expected.tsv
+Metadata-only update at the 0.1.0 release: the free-text modelled_on provenance notes in cases.json and cases.py were clarified (public issue references prefixed with their tracker; one internal identifier removed). Actions, ledgers and expected verdicts are unchanged; world.json and expected.tsv keep their original hashes.
