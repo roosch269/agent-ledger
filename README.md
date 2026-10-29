@@ -37,7 +37,7 @@ When several agents (any framework, any model family) work on the same project,
 they lose track of each other's decisions. One agent records a standing rule —
 *"never publish the repo"*, *"no spending without approval"*, *"freeze deploys on
 Fridays"* — and hours later a different agent, reasoning only from its own recent
-context, proposes exactly that. Notes go stale, two decisions quietly contradict
+context, proposes exactly that. Notes go stale, two decisions contradict
 each other, and nobody is holding the whole picture.
 
 `agent-ledger` is the shared memory. Agents append decisions, facts and rules to one

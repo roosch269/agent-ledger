@@ -73,7 +73,7 @@ First public release.
   bare CR and Unicode line separators) splits lines, so no second verdict can hide inside
   `WHY`; `WHY` text keeps its own inner Markdown.
 - **Codex adapter diagnostics.** `examples/codex-model.sh` keeps Codex's progress output
-  quiet but prints the last ~2 KB of it to stderr when the call fails or returns no reply.
+  suppressed but prints the last ~2 KB of it to stderr when the call fails or returns no reply.
 - **Frozen eval check.** The test suite verifies the `eval/bakery-42` files against
   `EXPECTED.lock` and checks `expected.tsv` against the case definitions.
 - **Fallback hint containment.** Short actions can match long rules using shared tokens

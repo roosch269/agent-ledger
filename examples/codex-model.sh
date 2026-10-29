@@ -10,7 +10,7 @@ trap 'rm -f "$out" "$err"' EXIT
 args=(exec --skip-git-repo-check --ephemeral -s read-only --color never -o "$out"
       -c "model_reasoning_effort=\"${CODEX_EFFORT:-low}\"")
 [ -n "${CODEX_MODEL:-}" ] && args+=(-m "$CODEX_MODEL")
-# Keep Codex's progress output quiet, but surface the end of it if the call fails,
+# Suppress Codex's progress output, but surface the end of it if the call fails,
 # so agent-ledger can report it in the UNKNOWN reason.
 if ! codex "${args[@]}" - >/dev/null 2>"$err"; then
   tail -c 2048 "$err" >&2
